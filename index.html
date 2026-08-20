@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Counter</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Counter">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" id="themeColor" content="#534AB7">
+<style>
+  *{ box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: #534AB7;
+    color: #fff;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    transition: background .25s ease;
+  }
+  #app {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: calc(env(safe-area-inset-top) + 18px) 22px calc(env(safe-area-inset-bottom) + 22px);
+  }
+  header { display: flex; align-items: center; justify-content: space-between; }
+  #nameLabel { font-size: min(6.5vw, 28px); font-weight: 600; opacity: .9; line-height: 1.2; padding-right: 10px; }
+  #gear { background: none; border: 0; color: #fff; opacity: .8; padding: 6px; cursor: pointer; flex: 0 0 auto; }
+  #body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  #stage { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  #body.side { flex-direction: row; gap: 16px; align-items: stretch; }
+  #body.side #controls { flex: 0 0 auto; align-self: flex-end; }
+  #body.side #controls button { height: auto !important; flex: 1; border-radius: 18px !important; }
+  main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  #count {
+    font-size: 42vw;
+    font-weight: 600;
+    letter-spacing: -0.04em;
+    line-height: .88;
+    font-variant-numeric: tabular-nums;
+  }
+  #ofLabel { font-size: min(7vw, 30px); font-weight: 500; opacity: .85; margin-top: 12px; }
+  #bar { height: 8px; border-radius: 4px; background: rgba(255,255,255,.25); overflow: hidden; margin-bottom: 22px; }
+  #fill { height: 100%; width: 0%; background: #fff; border-radius: 4px; transition: width .2s ease, background .2s ease; }
+  #controls { display: flex; gap: 12px; }
+  #controls button {
+    flex: 1; height: 76px; border: 0; border-radius: 38px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: transform .08s ease, opacity .15s ease;
+  }
+  #controls.swap { flex-direction: row-reverse; }
+  #controls.stack { flex-direction: column; }
+  #controls.stack.swap { flex-direction: column-reverse; }
+  #controls button:active { transform: scale(.96); }
+  #minus { background: rgba(255,255,255,.2); color: #fff; }
+  #minus:disabled { opacity: .35; }
+  #plus { background: #fff; color: #534AB7; }
+  #app.flash { animation: flash .18s ease 3; }
+  @keyframes flash { 50% { background: rgba(255,255,255,.5); } }
+
+  #overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.4);
+    display: none; align-items: flex-end; z-index: 10;
+  }
+  #overlay.open { display: flex; }
+  #sheet {
+    width: 100%; background: #fff; color: #111;
+    border-radius: 20px 20px 0 0;
+    padding: 20px 22px calc(env(safe-area-inset-bottom) + 24px);
+    max-height: 88%; overflow-y: auto;
+  }
+  #sheet h2 { font-size: 19px; font-weight: 600; margin-bottom: 18px; }
+  .field { margin-bottom: 22px; }
+  .field > label { display: block; font-size: 13px; font-weight: 500; color: #666; margin-bottom: 8px; }
+  input[type=text], input[type=number] {
+    width: 100%; font-size: 17px; padding: 12px 14px;
+    border: 1px solid #d8d8d8; border-radius: 10px; font-family: inherit; background: #fff; color: #111;
+  }
+  input[type=range] { width: 100%; margin-top: 12px; accent-color: #534AB7; }
+  #swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .sw { aspect-ratio: 1; border-radius: 50%; border: 0; cursor: pointer; }
+  .sw[aria-pressed="true"] { box-shadow: 0 0 0 3px #fff, 0 0 0 6px #111; }
+  .row { display: flex; gap: 10px; }
+  .seg { display: flex; gap: 8px; }
+  .seg button {
+    flex: 1; padding: 12px 6px; font-size: 15px; font-family: inherit;
+    border: 1px solid #d8d8d8; background: #fff; color: #111;
+    border-radius: 10px; cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] { background: #111; color: #fff; border-color: #111; }
+  .row button {
+    flex: 1; padding: 14px; font-size: 16px; font-family: inherit; font-weight: 500;
+    border-radius: 12px; cursor: pointer;
+  }
+  #resetBtn { background: #fff; color: #c0392b; border: 1px solid #e0b4ae; }
+  #doneBtn { background: #111; color: #fff; border: 0; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header>
+    <span id="nameLabel">My Counter</span>
+    <button id="gear" aria-label="Settings">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </header>
+
+  <div id="body">
+    <div id="stage">
+      <main>
+        <div id="count">0</div>
+        <div id="ofLabel"><span id="ofText">of</span> <span id="ofNum">100</span></div>
+      </main>
+      <div id="bar"><div id="fill"></div></div>
+    </div>
+
+    <div id="controls">
+    <button id="minus" aria-label="Subtract one">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/></svg>
+    </button>
+    <button id="plus" aria-label="Add one">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+    </div>
+  </div>
+</div>
+
+<div id="overlay">
+  <div id="sheet">
+    <h2>Settings</h2>
+
+    <div class="field">
+      <label for="nameInput">Counter name</label>
+      <input type="text" id="nameInput" maxlength="24" placeholder="My Counter">
+    </div>
+
+    <div class="field">
+      <label for="limitInput">Limit</label>
+      <input type="number" id="limitInput" min="1" max="1000" step="1">
+      <input type="range" id="limitRange" min="10" max="1000" step="10">
+    </div>
+
+    <div class="field">
+      <label>Colour</label>
+      <div id="swatches"></div>
+    </div>
+
+    <div class="field">
+      <label for="labelInput">Label under the count</label>
+      <input type="text" id="labelInput" maxlength="24" placeholder="of">
+      <p style="font-size: 12px; color: #888; margin-top: 8px;">The capacity number is added after this automatically.</p>
+    </div>
+
+    <div class="field">
+      <label>Button arrangement</label>
+      <div class="seg" id="layoutSeg">
+        <button data-arrange="row">Side by side</button>
+        <button data-arrange="col">Stacked</button>
+        <button data-arrange="side">Side column</button>
+      </div>
+      <label for="sideSeg" style="margin-top: 18px;">Button order</label>
+      <div class="seg" id="sideSeg">
+        <button data-swap="0">&minus; first</button>
+        <button data-swap="1">+ first</button>
+      </div>
+      <label for="sizeRange" style="margin-top: 18px;">Button size</label>
+      <input type="range" id="sizeRange" min="56" max="120" step="4">
+      <label for="colRange" style="margin-top: 18px;">Column width (side column only)</label>
+      <input type="range" id="colRange" min="25" max="75" step="5">
+      <label for="colHRange" style="margin-top: 18px;">Column height (side column only)</label>
+      <input type="range" id="colHRange" min="30" max="100" step="5">
+      <label for="offsetRange" style="margin-top: 18px;">Height from bottom</label>
+      <input type="range" id="offsetRange" min="0" max="200" step="10">
+    </div>
+
+    <div class="field">
+      <label>Flash screen at capacity</label>
+      <div class="seg" id="flashSeg">
+        <button data-flash="1">On</button>
+        <button data-flash="0">Off</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <button id="resetBtn">Reset to 0</button>
+      <button id="doneBtn">Done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var COLOURS = [
+    "#534AB7", "#2563EB", "#0F766E", "#15803D",
+    "#C2410C", "#B91C1C", "#BE185D", "#334155"
+  ];
+
+  var mem = {};
+  function load(k, d) {
+    try { var v = localStorage.getItem(k); return v === null ? d : v; }
+    catch (e) { return k in mem ? mem[k] : d; }
+  }
+  function save(k, v) {
+    try { localStorage.setItem(k, v); } catch (e) { mem[k] = String(v); }
+  }
+
+  var state = {
+    count: parseInt(load("count", "0"), 10) || 0,
+    limit: parseInt(load("limit", "100"), 10) || 100,
+    name: load("name", "My Counter"),
+    colour: load("colour", COLOURS[0]),
+    swap: load("swap", "0") === "1",
+    arrange: load("arrange", "row"),
+    label: load("label", "of").replace(/\{limit\}|\{count\}/g, "").trim(),
+    colPct: parseInt(load("colPct", "50"), 10) || 50,
+    colH: parseInt(load("colH", "55"), 10) || 55,
+    btnSize: parseInt(load("btnSize", "76"), 10) || 76,
+    offset: parseInt(load("offset", "0"), 10) || 0,
+    flash: load("flash", "1") === "1"
+  };
+  if (state.count < 0) state.count = 0;
+
+  var app = document.getElementById("app");
+  var countEl = document.getElementById("count");
+  var ofEl = document.getElementById("ofLabel");
+  var ofText = document.getElementById("ofText");
+  var ofNum = document.getElementById("ofNum");
+  var fillEl = document.getElementById("fill");
+  var nameEl = document.getElementById("nameLabel");
+  var minusEl = document.getElementById("minus");
+  var plusEl = document.getElementById("plus");
+  var overlay = document.getElementById("overlay");
+  var nameInput = document.getElementById("nameInput");
+  var limitInput = document.getElementById("limitInput");
+  var limitRange = document.getElementById("limitRange");
+  var themeColor = document.getElementById("themeColor");
+  var swatches = document.getElementById("swatches");
+  var controls = document.getElementById("controls");
+  var sideSeg = document.getElementById("sideSeg");
+  var layoutSeg = document.getElementById("layoutSeg");
+  var flashSeg = document.getElementById("flashSeg");
+  var bodyEl = document.getElementById("body");
+  var stage = document.getElementById("stage");
+  var labelInput = document.getElementById("labelInput");
+  var colRange = document.getElementById("colRange");
+  var colHRange = document.getElementById("colHRange");
+  var sizeRange = document.getElementById("sizeRange");
+  var offsetRange = document.getElementById("offsetRange");
+
+  COLOURS.forEach(function (c) {
+    var b = document.createElement("button");
+    b.className = "sw";
+    b.style.background = c;
+    b.setAttribute("aria-label", "Colour " + c);
+    b.onclick = function () { state.colour = c; save("colour", c); render(); };
+    b.dataset.colour = c;
+    swatches.appendChild(b);
+  });
+
+  function buzz() {
+    if (!state.flash) return;
+    app.classList.remove("flash");
+    void app.offsetWidth;
+    app.classList.add("flash");
+  }
+
+  function render() {
+    countEl.textContent = state.count;
+    ofText.textContent = state.label;
+    ofNum.textContent = state.limit;
+    nameEl.textContent = state.name;
+    fillEl.style.width = Math.min(100, (state.count / state.limit) * 100) + "%";
+    fillEl.style.background = state.count >= state.limit ? "#FF453A" : "#fff";
+    document.body.style.background = state.colour;
+    plusEl.style.color = state.colour;
+    themeColor.setAttribute("content", state.colour);
+    minusEl.disabled = state.count === 0;
+    controls.classList.toggle("swap", state.swap);
+    controls.classList.toggle("stack", state.arrange !== "row");
+    bodyEl.classList.toggle("side", state.arrange === "side");
+    if (state.arrange === "side") {
+      controls.style.width = state.colPct + "%";
+      controls.style.height = state.colH + "%";
+      controls.style.marginBottom = "0px";
+      minusEl.style.height = plusEl.style.height = "";
+      minusEl.style.borderRadius = plusEl.style.borderRadius = "";
+    } else {
+      controls.style.width = "";
+      controls.style.height = "";
+      controls.style.marginBottom = state.offset + "px";
+      minusEl.style.height = plusEl.style.height = state.btnSize + "px";
+      minusEl.style.borderRadius = plusEl.style.borderRadius = (state.btnSize / 2) + "px";
+    }
+    sizeRange.value = state.btnSize;
+    colRange.value = state.colPct;
+    colHRange.value = state.colH;
+    if (document.activeElement !== labelInput) labelInput.value = state.label;
+    offsetRange.value = state.offset;
+    [].forEach.call(sideSeg.children, function (b) {
+      b.setAttribute("aria-pressed", (b.dataset.swap === "1") === state.swap ? "true" : "false");
+    });
+    [].forEach.call(layoutSeg.children, function (b) {
+      b.setAttribute("aria-pressed", b.dataset.arrange === state.arrange ? "true" : "false");
+    });
+    [].forEach.call(flashSeg.children, function (b) {
+      b.setAttribute("aria-pressed", (b.dataset.flash === "1") === state.flash ? "true" : "false");
+    });
+    if (document.activeElement !== nameInput) nameInput.value = state.name;
+    if (document.activeElement !== limitInput) limitInput.value = state.limit;
+    limitRange.value = Math.min(1000, Math.max(10, state.limit));
+    [].forEach.call(swatches.children, function (b) {
+      b.setAttribute("aria-pressed", b.dataset.colour === state.colour ? "true" : "false");
+    });
+    fitText();
+  }
+
+  function fitText() {
+    var w = stage.clientWidth || window.innerWidth;
+    var digits = String(state.count).length;
+    var factor = digits <= 2 ? 0.58 : digits === 3 ? 0.42 : 0.32;
+    countEl.style.fontSize = Math.round(Math.min(w * factor, 300)) + "px";
+    ofEl.style.fontSize = Math.round(Math.min(w * 0.13, 38)) + "px";
+    nameEl.style.fontSize = Math.round(Math.min((app.clientWidth || w) * 0.075, 34)) + "px";
+  }
+
+  plusEl.onclick = function () {
+    var before = state.count;
+    state.count++;
+    save("count", state.count);
+    if (before < state.limit && state.count >= state.limit) buzz();
+    render();
+  };
+
+  minusEl.onclick = function () {
+    if (state.count <= 0) return;
+    state.count--;
+    save("count", state.count);
+    render();
+  };
+
+  document.getElementById("gear").onclick = function () { overlay.classList.add("open"); };
+  document.getElementById("doneBtn").onclick = function () { overlay.classList.remove("open"); };
+  overlay.onclick = function (e) { if (e.target === overlay) overlay.classList.remove("open"); };
+
+  document.getElementById("resetBtn").onclick = function () {
+    state.count = 0; save("count", 0); render();
+  };
+
+  nameInput.oninput = function () {
+    state.name = this.value || "My Counter";
+    save("name", state.name);
+    nameEl.textContent = state.name;
+  };
+
+  function setLimit(v) {
+    v = parseInt(v, 10);
+    if (isNaN(v) || v < 1) v = 1;
+    if (v > 1000) v = 1000;
+    state.limit = v;
+    save("limit", v);
+    render();
+  }
+  limitInput.onchange = function () { setLimit(this.value); };
+  limitRange.oninput = function () { setLimit(this.value); };
+
+  [].forEach.call(sideSeg.children, function (b) {
+    b.onclick = function () {
+      state.swap = b.dataset.swap === "1";
+      save("swap", state.swap ? "1" : "0");
+      render();
+    };
+  });
+
+  [].forEach.call(layoutSeg.children, function (b) {
+    b.onclick = function () {
+      state.arrange = b.dataset.arrange;
+      save("arrange", state.arrange);
+      render();
+    };
+  });
+
+  labelInput.oninput = function () {
+    state.label = this.value;
+    save("label", state.label);
+    render();
+  };
+
+  colRange.oninput = function () {
+    state.colPct = parseInt(this.value, 10);
+    save("colPct", state.colPct);
+    render();
+  };
+
+  colHRange.oninput = function () {
+    state.colH = parseInt(this.value, 10);
+    save("colH", state.colH);
+    render();
+  };
+
+  [].forEach.call(flashSeg.children, function (b) {
+    b.onclick = function () {
+      state.flash = b.dataset.flash === "1";
+      save("flash", state.flash ? "1" : "0");
+      render();
+      if (state.flash) buzz();
+    };
+  });
+
+  window.addEventListener("resize", fitText);
+  window.addEventListener("orientationchange", fitText);
+
+  sizeRange.oninput = function () {
+    state.btnSize = parseInt(this.value, 10);
+    save("btnSize", state.btnSize);
+    render();
+  };
+
+  offsetRange.oninput = function () {
+    state.offset = parseInt(this.value, 10);
+    save("offset", state.offset);
+    render();
+  };
+
+  render();
+})();
+</script>
+</body>
+</html>
