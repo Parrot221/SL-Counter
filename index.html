@@ -34,7 +34,13 @@
   #gear { background: none; border: 0; color: #fff; opacity: .8; padding: 6px; cursor: pointer; flex: 0 0 auto; }
   #body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
   #stage { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-  #body.side { flex-direction: row; gap: 16px; align-items: stretch; }
+  #body.side { flex-direction: row; gap: 16px; align-items: stretch; position: relative; }
+  #body.side #count {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1;
+  }
   #body.side #controls { flex: 0 0 auto; align-self: flex-end; }
   #body.side #controls button { height: auto !important; flex: 1; border-radius: 18px !important; }
   main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
@@ -55,8 +61,8 @@
     cursor: pointer; transition: transform .08s ease, opacity .15s ease;
   }
   #controls.swap { flex-direction: row-reverse; }
-  #controls.stack { flex-direction: column; }
-  #controls.stack.swap { flex-direction: column-reverse; }
+  #body.side #controls { flex-direction: column; }
+  #body.side #controls.swap { flex-direction: column-reverse; }
   #controls button:active { transform: scale(.96); }
   #minus { background: rgba(255,255,255,.2); color: #fff; }
   #minus:disabled { opacity: .35; }
@@ -162,7 +168,6 @@
       <label>Button arrangement</label>
       <div class="seg" id="layoutSeg">
         <button data-arrange="row">Side by side</button>
-        <button data-arrange="col">Stacked</button>
         <button data-arrange="side">Side column</button>
       </div>
       <label for="sideSeg" style="margin-top: 18px;">Button order</label>
@@ -217,7 +222,7 @@
     name: load("name", "My Counter"),
     colour: load("colour", COLOURS[0]),
     swap: load("swap", "0") === "1",
-    arrange: load("arrange", "row"),
+    arrange: load("arrange", "row") === "side" ? "side" : "row",
     label: load("label", "of").replace(/\{limit\}|\{count\}/g, "").trim(),
     colPct: parseInt(load("colPct", "50"), 10) || 50,
     colH: parseInt(load("colH", "55"), 10) || 55,
@@ -283,7 +288,6 @@
     themeColor.setAttribute("content", state.colour);
     minusEl.disabled = state.count === 0;
     controls.classList.toggle("swap", state.swap);
-    controls.classList.toggle("stack", state.arrange !== "row");
     bodyEl.classList.toggle("side", state.arrange === "side");
     if (state.arrange === "side") {
       controls.style.width = state.colPct + "%";
@@ -322,12 +326,26 @@
   }
 
   function fitText() {
-    var w = stage.clientWidth || window.innerWidth;
+    var side = state.arrange === "side";
+    var full = app.clientWidth || window.innerWidth;
+    var w = side ? full : (stage.clientWidth || full);
     var digits = String(state.count).length;
     var factor = digits <= 2 ? 0.58 : digits === 3 ? 0.42 : 0.32;
-    countEl.style.fontSize = Math.round(Math.min(w * factor, 300)) + "px";
-    ofEl.style.fontSize = Math.round(Math.min(w * 0.13, 38)) + "px";
-    nameEl.style.fontSize = Math.round(Math.min((app.clientWidth || w) * 0.075, 34)) + "px";
+    var size = Math.min(w * factor, 300);
+
+    if (side) {
+      var topH = (bodyEl.clientHeight || 0) * (100 - state.colH) / 100;
+      countEl.style.height = topH + "px";
+      stage.style.paddingTop = topH + "px";
+      if (topH > 0) size = Math.min(size, topH * 0.92);
+    } else {
+      countEl.style.height = "";
+      stage.style.paddingTop = "";
+    }
+
+    countEl.style.fontSize = Math.round(size) + "px";
+    ofEl.style.fontSize = Math.round(Math.min((stage.clientWidth || full) * 0.13, 38)) + "px";
+    nameEl.style.fontSize = Math.round(Math.min(full * 0.075, 34)) + "px";
   }
 
   plusEl.onclick = function () {
