@@ -67,6 +67,12 @@
   #minus { background: rgba(255,255,255,.2); color: #fff; }
   #minus:disabled { opacity: .35; }
   #plus { background: #fff; color: #534AB7; }
+  .hap {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    margin: 0; padding: 0; opacity: 0;
+    clip-path: inset(0 round 38px);
+  }
   #app.flash { animation: flash .18s ease 3; }
   @keyframes flash { 50% { background: rgba(255,255,255,.5); } }
 
@@ -269,6 +275,34 @@
     swatches.appendChild(b);
   });
 
+  // --- Haptics -------------------------------------------------------
+  // iOS has no Vibration API. Safari 17.4+ plays a Taptic tick when a native
+  // <input type="checkbox" switch> is toggled by a real finger tap, so an
+  // invisible one is laid over each button. The tap's click still bubbles up
+  // to the button, so the normal onclick handlers below are untouched.
+  var hasSwitch = "switch" in document.createElement("input");
+
+  function addHaptic(btn) {
+    if (!hasSwitch) return null;
+    var s = document.createElement("input");
+    s.type = "checkbox";
+    s.setAttribute("switch", "");
+    s.className = "hap";
+    s.tabIndex = -1;
+    s.setAttribute("aria-hidden", "true");
+    btn.style.position = "relative";
+    btn.appendChild(s);
+    return s;
+  }
+
+  var minusHap = addHaptic(minusEl);
+  var plusHap = addHaptic(plusEl);
+
+  function tap() {
+    // Android and anything else that supports the real API.
+    if (!hasSwitch && navigator.vibrate) navigator.vibrate(8);
+  }
+
   function buzz() {
     if (!state.flash) return;
     app.classList.remove("flash");
@@ -302,6 +336,12 @@
       minusEl.style.height = plusEl.style.height = state.btnSize + "px";
       minusEl.style.borderRadius = plusEl.style.borderRadius = (state.btnSize / 2) + "px";
     }
+    var hapRadius = state.arrange === "side" ? "18px" : (state.btnSize / 2) + "px";
+    if (minusHap) {
+      minusHap.style.clipPath = "inset(0 round " + hapRadius + ")";
+      minusHap.disabled = minusEl.disabled;
+    }
+    if (plusHap) plusHap.style.clipPath = "inset(0 round " + hapRadius + ")";
     sizeRange.value = state.btnSize;
     colRange.value = state.colPct;
     colHRange.value = state.colH;
@@ -349,6 +389,7 @@
   }
 
   plusEl.onclick = function () {
+    tap();
     var before = state.count;
     state.count++;
     save("count", state.count);
@@ -358,6 +399,7 @@
 
   minusEl.onclick = function () {
     if (state.count <= 0) return;
+    tap();
     state.count--;
     save("count", state.count);
     render();
